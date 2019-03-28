@@ -216,12 +216,7 @@ def decode_results(values):
     return values
 
 class TaskLogger(models.Model):
-    task = models.ForeignKey(
-            Task,
-            null = False,
-            blank = False,
-            on_delete = models.PROTECT
-            )
+    task_id = models.CharField(max_length=32, null=False, blank=False)
     date = models.DateTimeField(auto_now_add=True, blank=True)
     log = models.TextField(
             null = True,

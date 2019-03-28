@@ -114,12 +114,21 @@ class QueueAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         """Don't allow adds."""
         return False
+class TaskLoggerAdmin(admin.ModelAdmin):
+    list_display=(
+            'task_id',
+            'log',
+            'date_seconds'
+            )
+    def date_seconds(self, obj):
+        return obj.date.strftime("%d %b %Y %H:%M:%S")
+    date_seconds.short_description = 'Time'
 
 
 admin.site.register(Schedule, ScheduleAdmin)
 admin.site.register(Success, TaskAdmin)
 admin.site.register(Failure, FailAdmin)
-admin.site.register(TaskLogger)
+admin.site.register(TaskLogger, TaskLoggerAdmin)
 
 if Conf.ORM or Conf.TESTING:
     admin.site.register(OrmQ, QueueAdmin)
