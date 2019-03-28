@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
 
 from django_q.conf import Conf
-from django_q.models import Success, Failure, Schedule, OrmQ
+from django_q.models import Success, Failure, Schedule, OrmQ, TaskLogger
 from django_q.tasks import async_task
 
 
@@ -119,6 +119,7 @@ class QueueAdmin(admin.ModelAdmin):
 admin.site.register(Schedule, ScheduleAdmin)
 admin.site.register(Success, TaskAdmin)
 admin.site.register(Failure, FailAdmin)
+admin.site.register(TaskLogger)
 
 if Conf.ORM or Conf.TESTING:
     admin.site.register(OrmQ, QueueAdmin)

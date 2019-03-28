@@ -214,3 +214,18 @@ def decode_results(values):
         # decode values in 1.7
         return [dbsafe_decode(v) for v in values]
     return values
+
+class TaskLogger(models.Model):
+    task = models.ForeignKey(
+            Task,
+            null = False,
+            blank = False,
+            on_delete = models.PROTECT
+            )
+    date = models.DateTimeField(auto_now_add=True, blank=True)
+    log = models.TextField(
+            null = True,
+            blank=True,
+            default=None
+            )
+
