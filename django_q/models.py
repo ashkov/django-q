@@ -228,15 +228,15 @@ LOG_LEVELS = (
 )
 class TaskLogger(models.Model):
     task_id = models.CharField(max_length=32, null=False, blank=False)
-    date = models.DateTimeField(auto_now_add=True, blank=True)
     logger_name = models.CharField(max_length=100)
     level = models.PositiveSmallIntegerField(choices=LOG_LEVELS, default=logging.ERROR, db_index=True)
-    log = models.TextField(
+    msg = models.TextField(
             null = True,
             blank=True,
             default=None
             )
     trace = models.TextField(blank=True, null=True)
+    create_datetime = models.DateTimeField(auto_now_add=True, blank=True)
     def __str__(self):
         return self.log
     class Meta:

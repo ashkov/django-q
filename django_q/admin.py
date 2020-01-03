@@ -117,11 +117,11 @@ class QueueAdmin(admin.ModelAdmin):
 class TaskLoggerAdmin(admin.ModelAdmin):
     list_display=(
             'task_id',
-            'log',
+            'msg',
             'date_seconds'
             )
     def date_seconds(self, obj):
-        return obj.date.strftime("%d %b %Y %H:%M:%S")
+        return obj.create_datetime.strftime("%d %b %Y %H:%M:%S")
     date_seconds.short_description = 'Time'
 
 
