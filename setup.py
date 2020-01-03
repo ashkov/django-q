@@ -36,7 +36,7 @@ setup(
     license='MIT',
     description='A multiprocessing distributed task queue for Django',
     long_description=README,
-    install_requires=['django>=1.11', 'django-picklefield', 'blessed', 'arrow'],
+    install_requires=['django==1.11.14', 'django-picklefield', 'blessed', 'arrow'],
     test_requires=['pytest', 'pytest-django', ],
     cmdclass={'test': PyTest},
     classifiers=[
