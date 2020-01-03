@@ -11,6 +11,9 @@ from picklefield.fields import dbsafe_decode
 
 from django_q.signing import SignedPackage
 
+import logging
+from django.utils.translation import ugettext_lazy as _
+
 
 class Task(models.Model):
     id = models.CharField(max_length=32, primary_key=True, editable=False)
@@ -215,12 +218,27 @@ def decode_results(values):
         return [dbsafe_decode(v) for v in values]
     return values
 
+LOG_LEVELS = (
+    (logging.NOTSET, _('NotSet')),
+    (logging.INFO, _('Info')),
+    (logging.WARNING, _('Warning')),
+    (logging.DEBUG, _('Debug')),
+    (logging.ERROR, _('Error')),
+    (logging.FATAL, _('Fatal')),
+)
 class TaskLogger(models.Model):
     task_id = models.CharField(max_length=32, null=False, blank=False)
     date = models.DateTimeField(auto_now_add=True, blank=True)
+    logger_name = models.CharField(max_length=100)
+    level = models.PositiveSmallIntegerField(choices=LOG_LEVELS, default=logging.ERROR, db_index=True)
     log = models.TextField(
             null = True,
             blank=True,
             default=None
             )
-
+    trace = models.TextField(blank=True, null=True)
+    def __str__(self):
+        return self.log
+    class Meta:
+        ordering = ('-date')
+        verbose_name_plural = verbose_name = 'Logging'
