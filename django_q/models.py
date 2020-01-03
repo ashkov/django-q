@@ -240,5 +240,5 @@ class TaskLogger(models.Model):
     def __str__(self):
         return self.log
     class Meta:
-        ordering = ('-date',)
+        ordering = ('-create_datetime',)
         verbose_name_plural = verbose_name = 'Logging'
