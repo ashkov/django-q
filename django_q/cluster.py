@@ -16,6 +16,7 @@ import socket
 import traceback
 # Django
 from django import db
+from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from multiprocessing import Event, Process, Value, current_process
@@ -202,7 +203,6 @@ class Sentinel(object):
         self.start_event.set()
         Stat(self).save()
         logger.info(_('Q Cluster-{} running.').format(self.parent_pid))
-        scheduler(broker=self.broker)
         counter = 0
         cycle = Conf.GUARD_CYCLE  # guard loop sleep in seconds
         # Guard loop. Runs at least once
@@ -371,7 +371,7 @@ def worker(task_queue, result_queue, timer, timeout=Conf.TIMEOUT):
         # We're still going
         if not result:
             db.close_old_connections()
-            timer_value = task['kwargs'].pop('timeout', timeout)
+            timer_value = task.pop('timeout', timeout)
             # signal execution
             pre_execute.send(sender="django_q", func=f, task=task)
             # execute the payload
@@ -491,68 +491,69 @@ def scheduler(broker=None):
         broker = get_broker()
     db.close_old_connections()
     try:
-        for s in Schedule.objects.exclude(repeats=0).filter(next_run__lt=timezone.now()):
-            args = ()
-            kwargs = {}
-            # get args, kwargs and hook
-            if s.kwargs:
-                try:
-                    # eval should be safe here because dict()
-                    kwargs = eval('dict({})'.format(s.kwargs))
-                except SyntaxError:
-                    kwargs = {}
-            if s.args:
-                args = ast.literal_eval(s.args)
-                # single value won't eval to tuple, so:
-                if type(args) != tuple:
-                    args = (args,)
-            q_options = kwargs.get('q_options', {})
-            if s.hook:
-                q_options['hook'] = s.hook
-            # set up the next run time
-            if not s.schedule_type == s.ONCE:
-                next_run = arrow.get(s.next_run)
-                while True:
-                    if s.schedule_type == s.MINUTES:
-                        next_run = next_run.replace(minutes=+(s.minutes or 1))
-                    elif s.schedule_type == s.HOURLY:
-                        next_run = next_run.replace(hours=+1)
-                    elif s.schedule_type == s.DAILY:
-                        next_run = next_run.replace(days=+1)
-                    elif s.schedule_type == s.WEEKLY:
-                        next_run = next_run.replace(weeks=+1)
-                    elif s.schedule_type == s.MONTHLY:
-                        next_run = next_run.replace(months=+1)
-                    elif s.schedule_type == s.QUARTERLY:
-                        next_run = next_run.replace(months=+3)
-                    elif s.schedule_type == s.YEARLY:
-                        next_run = next_run.replace(years=+1)
-                    if Conf.CATCH_UP or next_run > arrow.utcnow():
-                        break
-                s.next_run = next_run.datetime
-                s.repeats += -1
-            # send it to the cluster
-            q_options['broker'] = broker
-            q_options['group'] = q_options.get('group', s.name or s.id)
-            kwargs['q_options'] = q_options
-            s.task = django_q.tasks.async_task(s.func, *args, **kwargs)
-            # log it
-            if not s.task:
-                logger.error(
-                    _('{} failed to create a task from schedule [{}]').format(current_process().name,
-                                                                              s.name or s.id))
-            else:
-                logger.info(
-                    _('{} created a task from schedule [{}]').format(current_process().name, s.name or s.id))
-            # default behavior is to delete a ONCE schedule
-            if s.schedule_type == s.ONCE:
-                if s.repeats < 0:
-                    s.delete()
-                    continue
-                # but not if it has a positive repeats
-                s.repeats = 0
-            # save the schedule
-            s.save()
+        with db.transaction.atomic():
+            for s in Schedule.objects.select_for_update().exclude(repeats=0).filter(next_run__lt=timezone.now()):
+                args = ()
+                kwargs = {}
+                # get args, kwargs and hook
+                if s.kwargs:
+                    try:
+                        # eval should be safe here because dict()
+                        kwargs = eval('dict({})'.format(s.kwargs))
+                    except SyntaxError:
+                        kwargs = {}
+                if s.args:
+                    args = ast.literal_eval(s.args)
+                    # single value won't eval to tuple, so:
+                    if type(args) != tuple:
+                        args = (args,)
+                q_options = kwargs.get('q_options', {})
+                if s.hook:
+                    q_options['hook'] = s.hook
+                # set up the next run time
+                if not s.schedule_type == s.ONCE:
+                    next_run = arrow.get(s.next_run)
+                    while True:
+                        if s.schedule_type == s.MINUTES:
+                            next_run = next_run.shift(minutes=+(s.minutes or 1))
+                        elif s.schedule_type == s.HOURLY:
+                            next_run = next_run.shift(hours=+1)
+                        elif s.schedule_type == s.DAILY:
+                            next_run = next_run.shift(days=+1)
+                        elif s.schedule_type == s.WEEKLY:
+                            next_run = next_run.shift(weeks=+1)
+                        elif s.schedule_type == s.MONTHLY:
+                            next_run = next_run.shift(months=+1)
+                        elif s.schedule_type == s.QUARTERLY:
+                            next_run = next_run.shift(months=+3)
+                        elif s.schedule_type == s.YEARLY:
+                            next_run = next_run.shift(years=+1)
+                        if Conf.CATCH_UP or next_run > arrow.utcnow():
+                            break
+                    s.next_run = next_run.datetime
+                    s.repeats += -1
+                # send it to the cluster
+                q_options['broker'] = broker
+                q_options['group'] = q_options.get('group', s.name or s.id)
+                kwargs['q_options'] = q_options
+                s.task = django_q.tasks.async_task(s.func, *args, **kwargs)
+                # log it
+                if not s.task:
+                    logger.error(
+                        _('{} failed to create a task from schedule [{}]').format(current_process().name,
+                                                                                  s.name or s.id))
+                else:
+                    logger.info(
+                        _('{} created a task from schedule [{}]').format(current_process().name, s.name or s.id))
+                # default behavior is to delete a ONCE schedule
+                if s.schedule_type == s.ONCE:
+                    if s.repeats < 0:
+                        s.delete()
+                        continue
+                    # but not if it has a positive repeats
+                    s.repeats = 0
+                # save the schedule
+                s.save()
     except Exception as e:
         logger.error(e)
 
